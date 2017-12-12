@@ -8,7 +8,7 @@ En un primer análisis:
 * Existen 290 atributos distintos:
   * Existen atributos numéricos (edad, salarios..) , categóricos y de texto libre. Con respuesta simple o múltiple.
   * Se dividen en dos ficheros según sean de respuesta de texto libre (FREE) o de selección/tipadas (SELECT). No existe relación e incluso los de respuesta libre han sido aleatorizados/anonimizados (permutados atributos por filas).
-  * Algunos solo son respondidos por subconjuntos según otras respuestas/categorias (si están trabajando...) y otras por todos (All).
+  * Algunos solo son respondidos por subconjuntos según otras respuestas/categorias (si están trabajando...) y otras por todos (All).
 
 Como creo que la finalidad de la práctica es enfrentarte a un conjunto de datos heterogéneo, realizar un data profiling (incluyendo pruebas estadisticas) y plantear transformaciones útiles para el tratamiento posterior; mi idea es la siguiente (teniendo en cuenta que el conjunto de atributos es muy grande):
 1. Hacer un análisis rápido de todas las columnas: semanticamente, formatos y distribución de valores (no incluyendo las de texto libre de principio).
