@@ -1,0 +1,110 @@
+#------------------------LIBRERIAS---------------------
+library(Rcmdr)
+library(plyr)
+library(dplyr)
+
+
+#------------------------CARGA DE DATOS---------------------
+aux<- read.csv("C:/Users/jesus/Documents/Estudios/UOC/1CUAT/TIPOLOYCICLO/PRA2/datos/kaggle-survey-2017/multipleChoiceResponses.csv")
+datos.origen<-aux[,c('GenderSelect','Country','Age','EmploymentStatus','CodeWriter','CurrentJobTitleSelect','CurrentEmployerType','LearningDataScienceTime','FormalEducation','ParentsEducation','EmployerIndustry','EmployerSize','EmployerMLTime','JobFunctionSelect','AlgorithmUnderstandingLevel','CompensationAmount','CompensationCurrency','SalaryChange','JobSatisfaction')]
+
+
+#------------------------PROCESODATOS------------------------------
+#Seleccionamos con cantidad informada y convertmos a numero
+aux<-datos.origen[!is.na(datos.origen$CompensationAmount),]
+aux$CompensationAmount<-as.numeric(as.character(aux$CompensationAmount))
+#Filtramos por pais y moneda
+datos.US<-subset(aux, (Country=='United States') & (CompensationCurrency=='USD' |CompensationCurrency=='' ))
+#Filtramos por pais y moneda
+datos.SP<-subset(aux, (Country=='Spain') & (CompensationCurrency=='EUR' |CompensationCurrency=='' ))
+
+
+#Aplicamos rango a sueldo y redondeamos a miles
+datos.SP<-mutate(datos.SP,CompensationAmount = round(ifelse(CompensationAmount < 500 , CompensationAmount , CompensationAmount/1000)))
+datos.SP<-subset(datos.SP, CompensationAmount>10 & CompensationAmount < 200 )
+
+datos.US<-mutate(datos.US,CompensationAmount = round(ifelse(CompensationAmount < 500 , CompensationAmount , CompensationAmount/1000)))
+datos.US<-subset(datos.US, CompensationAmount>10 & CompensationAmount < 500 )
+
+#Construimos factores accesorios
+#dataFrame auxiliares auxiliares
+
+datos.mergeFormalEducation=data.frame(FormalEducation=c("","I prefer not to answer","I did not complete any formal education past high school","Some college/university study without earning a bachelor's degree","Bachelor's degree","Master's degree","Professional degree","Doctoral degree"),LEduc=c(0,0,1,2,3,4,5,6))
+
+datos.EmployerSize=data.frame(EmployerSize=c("","I prefer not to answer","I don't know","Fewer than 10 employees","10 to 19 employees","20 to 99 employees","100 to 499 employees","500 to 999 employees","1,000 to 4,999 employees","5,000 to 9,999 employees"=7500,"10,000 or more employees"),EmployS=c(0,0,0,5,15,60,250,750,2500,7500,15000))
+
+datos.EmployerMLTime=data.frame(EmployerMLTime=c("","Don't know","Less than one year","1-2 years","3-5 years","6-10 years","More than 10 years"),LEmployT=c(0,0,0.5,1.5,4,8,12))
+
+datos.AlgorithmUnderstandingLevel=data.frame(AlgorithmUnderstandingLevel=c("","Enough to run the code / standard library","Enough to explain the algorithm to someone non-technical","Enough to code it again from scratch, albeit it may run slowly","Enough to code it from scratch and it will run blazingly fast and be super efficient","Enough to refine and innovate on the algorithm"),AlgorithU=c(0,1,2,3,4,5))
+
+
+#DatosSP
+aux<-datos.SP
+aux<-mutate(aux,isMale=ifelse(GenderSelect=='Male',1,0))
+aux<-mutate(aux,isFemale=ifelse(GenderSelect=='Female',1,0))
+aux<-mutate(aux,isFemale=ifelse(GenderSelect=='Female',1,0))
+aux<- merge(aux,datos.mergeFormalEducation,by="FormalEducation")
+aux<- merge(aux,datos.EmployerSize,by="EmployerSize")
+aux<- merge(aux,datos.EmployerMLTime,by="EmployerMLTime")
+aux<- merge(aux,datos.AlgorithmUnderstandingLevel,by="AlgorithmUnderstandingLevel")
+datos.SP2<-aux[,c('CompensationAmount','Age','isMale','isFemale','LEduc','EmployS','LEmployT','AlgorithU')]
+
+aux<-datos.US
+aux<-mutate(aux,isMale=ifelse(GenderSelect=='Male',1,0))
+aux<-mutate(aux,isFemale=ifelse(GenderSelect=='Female',1,0))
+aux<-mutate(aux,isFemale=ifelse(GenderSelect=='Female',1,0))
+aux<- merge(aux,datos.mergeFormalEducation,by="FormalEducation")
+aux<- merge(aux,datos.EmployerSize,by="EmployerSize")
+aux<- merge(aux,datos.EmployerMLTime,by="EmployerMLTime")
+aux<- merge(aux,datos.AlgorithmUnderstandingLevel,by="AlgorithmUnderstandingLevel")
+datos.US2<-aux[,c('CompensationAmount','Age','isMale','isFemale','LEduc','EmployS','LEmployT','AlgorithU')]
+
+
+#------------------------GRAFICAS------------------------------
+scatterplotMatrix(~Age+AlgorithU+CompensationAmount+EmployS+LEduc+LEmployT, 
+  reg.line=FALSE, smooth=FALSE, spread=FALSE, span=0.5, ellipse=FALSE, 
+  levels=c(.5, .9), id.n=0, diagonal = 'density', data=datos.US2)
+
+scatterplotMatrix(~Age+AlgorithU+CompensationAmount+EmployS+LEduc+LEmployT, 
+                  reg.line=FALSE, smooth=FALSE, spread=FALSE, span=0.5, ellipse=FALSE, 
+                 levels=c(.5, .9), id.n=0, diagonal = 'density', data=datos.SP2,)
+
+
+
+
+aux<-datos.US2
+old.par <- par(mfrow=c(3, 2))
+with(aux,plotMeans(CompensationAmount, as.factor(isMale), error.bars="se", connect=TRUE))
+with(aux,plotMeans(CompensationAmount, as.factor(isFemale), error.bars="se", connect=TRUE))
+with(aux,plotMeans(CompensationAmount, as.factor(LEduc), error.bars="se", connect=TRUE))
+with(aux,plotMeans(CompensationAmount, as.factor(EmployS), error.bars="se", connect=TRUE))
+with(aux,plotMeans(CompensationAmount, as.factor(LEmployT), error.bars="se", connect=TRUE))
+with(aux,plotMeans(CompensationAmount, as.factor(AlgorithU), error.bars="se", connect=TRUE))
+par<-old.par
+
+aux<-datos.SP2
+old.par <- par(mfrow=c(3, 2))
+with(aux,plotMeans(CompensationAmount, as.factor(isMale), error.bars="se", connect=TRUE))
+with(aux,plotMeans(CompensationAmount, as.factor(isFemale), error.bars="se", connect=TRUE))
+with(aux,plotMeans(CompensationAmount, as.factor(LEduc), error.bars="se", connect=TRUE))
+with(aux,plotMeans(CompensationAmount, as.factor(EmployS), error.bars="se", connect=TRUE))
+with(aux,plotMeans(CompensationAmount, as.factor(LEmployT), error.bars="se", connect=TRUE))
+with(aux,plotMeans(CompensationAmount, as.factor(AlgorithU), error.bars="se", connect=TRUE))
+par<-old.par
+
+
+#-----------------------MODELOS-------------------------------------------------------------
+modelo.US <- lm(CompensationAmount ~ Age + isMale + EmployS + AlgorithU + LEmployT + LEduc   , data=datos.US2)
+summary(modelo.US)
+anova(modelo.US)
+modelo.resulUS<-step(modelo.US, direction="both")
+summary(modelo.resulUS)
+anova(modelo.resulUS)
+
+
+modelo.SP <- lm(CompensationAmount ~ Age + isMale + EmployS + AlgorithU + LEmployT + LEduc   , data=datos.SP2)
+summary(modelo.SP)
+anova(modelo.SP)
+modelo.resulSP<-step(modelo.SP, direction="both")
+summary(modelo.resulSP)
+anova(modelo.resulSP)

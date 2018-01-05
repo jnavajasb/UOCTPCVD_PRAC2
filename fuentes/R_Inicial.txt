@@ -1,0 +1,146 @@
+#------------------------LIBRERIAS---------------------
+library(Rcmdr)
+library(plyr)
+library(dplyr)
+
+
+#------------------------CARGA DE DATOS---------------------
+datos.origen <- read.csv("C:/Users/jesus/Documents/Estudios/UOC/1CUAT/TIPOLOYCICLO/PRA2/kaggle-survey-2017/multipleChoiceResponses.csv")
+
+
+#------------------------ESTUDIO INICIAL---------------------
+datos.summary<-summary(datos.origen)
+write.table(datos.summary, "C:/Users/jesus/Documents/Estudios/UOC/1CUAT/TIPOLOYCICLO/PRA2/columnas1.txt", sep="\t")
+datos.distintos<-lapply(datos.origen, function(x) length(unique(x)))
+write.table(datos.distintos, "C:/Users/jesus/Documents/Estudios/UOC/1CUAT/TIPOLOYCICLO/PRA2/columnas2.txt", sep="\t")
+datos.vacios<-lapply(datos.origen, function(x) c(sum(is.na(x)),sum((x==''), na.rm = TRUE)))
+write.table(datos.vacios, "C:/Users/jesus/Documents/Estudios/UOC/1CUAT/TIPOLOYCICLO/PRA2/columnas3.txt", sep="\t")
+datos.isfactor<-unlist(lapply(datos.origen,is.factor),use.names = FALSE)
+datos.distintos<-unlist(lapply(datos.origen, function(x) length(unique(x))),use.names = FALSE)
+datos.vacios2<-unlist(lapply(datos.vacios, function(x) sum(x)),use.names = FALSE)
+datos.informados<-(16716-datos.vacios2)/16716
+datos.meta<-data.frame(nombres=names(datos.origen),esfactor=as.factor(datos.isfactor),distintos=datos.distintos,informados=datos.informados)
+
+
+#------------------------GRAFICAS------------------------------
+with(datos.meta, Hist(informados, scale="frequency", breaks="Sturges",col="darkgray"))
+hist<-with(datos.meta, Hist(informados, scale="frequency", breaks="Sturges",col="darkgray",plot=FALSE))
+rbind(hist$breaks,hist$counts)
+
+with(datos.meta, Hist(distintos[esfactor==TRUE], scale="frequency",breaks =  c(0,10,50,100,1000,10000), col="darkgray"))
+hist<-with(datos.meta, Hist(distintos[esfactor==TRUE], scale="frequency",breaks =  c(0,10,50,100,1000,10000), col="darkgray",plot=FALSE))
+rbind(hist$breaks,hist$counts)
+
+with(datos.origen, pie(table(Country), labels=levels(Country), xlab="", ylab="", main="Country", col=rainbow_hcl(53)))
+
+#---------------------PRIMER ESTUDIO
+
+#FUNCION AUXILIAR
+mifun.plotn <- function(x,main="Histograma de frecuencias \ny distribución normal",
+                  xlab="X",ylab="Densidad") {
+  min <- min(x)
+  max <- max(x)
+  media <- mean(x)
+  dt <- sd(x)
+ 
+  hist(x,freq=F,main=main,xlab=xlab,ylab=ylab,col="darkgray",breaks="Sturges")
+  curve(dnorm(x,media,dt), min, max,add = T,col="blue")
+}
+
+
+
+
+#Obtencion datos paises
+write.table(unique(Country), "C:/temp/paises.txt", sep="\t")
+
+#PROCESO MANUAL DE CRUCE
+aux1 <- read.csv("C:/Users/jesus/Documents/Estudios/UOC/1CUAT/TIPOLOYCICLO/PRA2/datos/datos_paises.csv",na.strings = '#N/D')
+aux3<-aux1[c('Country','Population','ClasPerGDP')] 
+
+#Cruce de datos con paises y calculo porcentajes por millon de habitantes
+aux2<-datos.origen %>%  group_by(Country) %>% summarise(no_rows = length(Country),Age=mean(Age,na.rm = TRUE))
+datos.paises <- merge(aux2,aux3,by="Country")
+datos.paises$perRespuestas=datos.paises$no_rows/(datos.paises$Population/1000000)
+summary(datos.paises)
+write.table(datos.paises, "C:/Users/jesus/Documents/Estudios/UOC/1CUAT/TIPOLOYCICLO/PRA2/datos/paises.txt", sep="\t")
+
+#TEST:Normalidad edad por pais
+aux<-datos.paises$Age[!is.na(datos.paises$Age)]
+mifun.plotn(aux)
+shapiro.test(aux)
+
+
+#TEST:Normalidad respuestas por pais
+aux<-datos.paises$perRespuestas[!is.na(datos.paises$perRespuestas)]
+mifun.plotn(aux)
+shapiro.test(aux)
+
+#TEST: Edad Spain caracteristic
+paisesSinEspana<-datos.paises[datos.paises$Country!='Spain',]
+aux<-paisesSinEspana$Age[!is.na(paisesSinEspana$Age)]
+mesp<-datos.paises[datos.paises$Country=='Spain','Age']
+mesp
+t.test(aux,mu=mesp)
+wilcox.test(aux, mu=mesp)
+
+#TEST: Preguntas por millon Spain caracteristic 
+paisesSinEspana<-datos.paises[datos.paises$Country!='Spain',]
+aux<-paisesSinEspana$perRespuestas[!is.na(paisesSinEspana$perRespuestas)]
+mesp<-datos.paises[datos.paises$Country=='Spain','perRespuestas']
+mesp
+wilcox.test(aux, mu=mesp)
+t.test(aux,mu=mesp)
+
+
+#CORRELACION -GRAFICAS
+scatterplot(perRespuestas~ClasPerGDP, reg.line=FALSE, smooth=FALSE, 
+  spread=FALSE, boxplots=FALSE, span=0.5, ellipse=FALSE, levels=c(.5, .9), 
+  xlab="GDP Per Capita/10.000", ylab="Respuestas por millon", data=datos.paises)
+
+scatterplot(Age~ClasPerGDP, reg.line=FALSE, smooth=FALSE, 
+  spread=FALSE, boxplots=FALSE, span=0.5, ellipse=FALSE, levels=c(.5, .9), 
+  xlab="GDP Per Capita/10.000", ylab="Edad media encuestado", data=datos.paises)
+
+#PREPARACION TEST de dos muestras
+datos.paises$discRper=as.factor(datos.paises$ClasPerGDP>=3)
+
+
+#TEST:Dos vias edad por pais
+aux<-datos.paises[!is.na(datos.paises$Age),]
+aux<-aux[!is.na(aux$discRper),]
+
+t.test(aux$Age~aux$discRper)
+var.test(aux$Age~aux$discRper)
+t.test(aux$Age~aux$discRper, var.equal=T)
+
+#TEST:Dos vias preguntas por millon por pais
+aux<-datos.paises[!is.na(datos.paises$perRespuestas),]
+aux<-aux[!is.na(aux$discRper),]
+
+wilcox.test(aux$perRespuestas~aux$discRper)
+
+#CORRELACION edad
+aux<-datos.paises[!is.na(datos.paises$Age),]
+aux<-aux[!is.na(aux$discRper),]
+cor(aux$Age,aux$ClasPerGDP)
+
+#CORRELACION respuestas
+aux<-datos.paises[!is.na(datos.paises$perRespuestas),]
+aux<-aux[!is.na(aux$discRper),]
+cor.test(aux$perRespuesta,aux$ClasPerGDP,method='spearman')
+
+
+
+#REGRESION edad
+aux<-datos.paises[!is.na(datos.paises$Age),]
+aux<-aux[!is.na(aux$discRper),]
+summary(lm(aux$Age~aux$ClasPerGDP))
+
+
+#REGRESION respuestas
+aux<-datos.paises[!is.na(datos.paises$perRespuestas),]
+aux<-aux[!is.na(aux$discRper),]
+summary(lm(aux$perRespuestas~aux$ClasPerGDP))
+
+
+
